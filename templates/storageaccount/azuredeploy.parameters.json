@@ -1,0 +1,17 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+
+    "SkuName" : { "value": "Standard_LRS" },
+    "AccountKind" : { "value": "StorageV2" },
+    "AccessTierDefault": {"value": "Hot"},
+    "CustomDomain": { "value": "" },
+
+    "ResourceLocation": {"value": "{{ ResourceLocation}}"},
+    "ApplicationName": { "value": "{{ ApplicationName}}" },
+    "ApplicationBusinessUnit": {"value": "{{ ApplicationBusinessUnit }}"},
+    "Environment": { "value": "{{ Environment }}" }
+
+  }
+}

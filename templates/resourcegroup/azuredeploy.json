@@ -1,0 +1,99 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.1",
+    "metadata": {
+        "comment": "This Azure Resource Managemer template creates an Azure Resource Group. It enforces conventions regarding the resource name and its tags.",
+        "author": "Yale University",
+        "licence": {
+            "uri": "/LICENSE.md"
+        }
+    },
+    "parameters": {
+        "ResourceLocation": {
+            "type": "string",
+            "metadata": {
+                "Description": "Azure region. (NB, This value will override the `-Location` parameter specified by `New-AzDeployment` or  the `--location` option of `az deploy create`"
+            }
+        },
+        "OwnerSignInName": {
+            "type": "string",
+            "metadata": {
+                "description": "The Azure sign-in name (email address) of the functional owner of the resource group to be placed into Azure. The person to be notified of changes or interruptions to the operations of their application or workload in Azure.",
+                "comment": "Institutional Property"
+            }
+        },
+        "ChargingAccount": {
+            "type": "string",
+            "metadata": {
+                "description": "The string denoting the account to which costs incurred by the application or workload to be placed in Azure should be charged.",
+                "comment": "Institutional Property"
+            }
+        },
+        "ApplicationName": {
+            "type": "string",
+            "metadata": {
+                "description": "A string that identifies the product or function of the application or workload to be placed into Azure.",
+                "comment": "Institutional Property"
+            }
+        },
+        "ApplicationBusinessUnit": {
+            "type": "string",
+            "metadata": {
+                "description": "A string that identifies the institutional business unit or academic department served by he product or function of the application to be placed into Azure",
+                "comment": "Institutional Property"
+            }            
+        },
+        "Environment": {
+            "type": "string",
+            "allowedValues": [ "dev", "test", "prod", "Dev", "Test", "Prod" ],
+            "metadata": {
+                "description": "The application or workload environment. Available values are dev, test and prod.",
+                "comment": "Institutional Property"
+            }
+        },
+        "DataSensitivity": {
+            "type": "string",
+            "defaultValue": "none",
+            "allowedValues": [ "High", "Moderate", "Low", "None", "high", "moderate", "low", "none" ],
+            "metadata": {
+                "description": "A string that denotes the degree of risk and impact to the institution should data handled by the resource be disclosed outside of the institution [ref](https://cybersecurity.yale.edu/classifyingtechnology).",
+                "comment": "Institutional Property"
+            }
+        }
+    },
+    "variables": {
+        "resourceGroupName": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'), '-rg')]",
+        "resourceLocation": "[parameters('ResourceLocation')]",
+        "resourceTags": {
+            "Application": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'))]",
+            "OwnerDepartmentContact": "[parameters('OwnerSignInName')]",
+            "DataSensitivity": "[parameters('DataSensitivity')]",
+            "ChargingAccount": "[parameters('ChargingAccount')]",
+            "Name": "[variables('resourceGroupName')]"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2018-05-01",
+            "location": "[variables('resourceLocation')]",
+            "name": "[variables('resourceGroupName')]",
+            "tags": "[variables('resourceTags')]",
+            "properties": {}
+        }
+    ],
+    "outputs": {
+        "resourceGroupName": {
+            "type": "string",
+            "value": "[variables('resourceGroupName')]"
+        },
+        "resourceId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Resources/resourceGroups', variables('resourceGroupName'))]"
+        },
+        "tags": {
+            "type": "object",
+            "value": "[variables('resourceTags')]"
+        }
+    }
+}
