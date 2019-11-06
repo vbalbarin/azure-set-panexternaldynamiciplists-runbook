@@ -31,6 +31,12 @@
     Specifying nothing will use the subscription in the current Azure login context.
 
 
+.PARAMETER StorageAccountName
+
+
+.PARAMETER StorageContainer
+
+
 .NOTES
     AUTHOR: Vincent Balbarin
     COPYRIGHT: Yale University 2019
@@ -46,7 +52,15 @@ param
     [Parameter(Mandatory=$False)]
     [AllowEmptyCollection()]
     [String[]]
-    $SubscriptionIDs   # SubscriptionIDs to look at
+    $SubscriptionIDs,
+
+    [Parameter(Mandatory=$True)]
+    [String]
+    $StorageAccount,
+
+    [Parameter(Mandatory=$True)]
+    [String]
+    $StorageContainer
 )
 
 
@@ -149,6 +163,20 @@ function Invoke-Main {
       Write-Verbose -Message $("Writing entry {0}/32 to {1}" -f $_.Key, $fn)
       Out-File @parms
     }
+
+    $AzureStorageContext = New-AzStorageContext -StorageAccountName "$StorageAccount" `
+                                                  -UseConnectedAccount
+
+      Get-ChildItem -Recurse "$temp/ZoneLists" | ForEach-Object {
+        $parms = @{
+          File = "$_"
+          Context = $AzureStorageContext
+          Container = $StorageContainer
+          Blob = "$($_.Directory.Name + '/' + $_.Name)"
+          Properties = @{"ContentType" = "text/plain;charset=ansi"}
+        }
+        Set-AzStorageBlobContent @parms -Force
+      }
   } else {
     Write-Warning -Message 'No external dynamic IP lists generated. Duplicates found'
     Write-Warning -Message 'Remove duplicate IP addresses in Azure Portal and run scripts again'
