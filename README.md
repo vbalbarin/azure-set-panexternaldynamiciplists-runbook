@@ -194,7 +194,7 @@ $AZURE_STORAGE_CONTAINER = New-AzStorageContainer -Context $AZURE_STORAGE_CONTEX
                                                   -Permission Off `
                                                   -Name 'pan-itsfts'
 
-# Set role as Storage Blob Data Owner over the newly created container
+# Set Storage Blob Data Owner role for current user over the newly created container
 $splat=@{}
 $splat = @{
   SignInName = $AZURE_CONTEXT_ACCOUNT_ID
@@ -221,6 +221,20 @@ Set-AzStorageBlobContent `
 # You can run the runbook here to populate the blobs and test locally
 
 ./runbook/Set-YalePanExternalDynamicIpLists.ps1 -SubscriptionIds @('all') -StorageAccount "$AZURE_STORAGE_ACCOUNT" -StorageContainer 'pan-itsfts' -Verbose
+
+# Set Storage Blob Contributor role for RunAs account to allow the runbook to update blobs
+$splat=@{}
+$splat = @{
+  ObjectId = "$AZURE_AUTOMATION_RUNASACCOUNT_SP_OBJID"
+  RoleDefinitionName = "Storage Blob Data Contributor"
+  Scope = (("/subscriptions/{0}" + `
+             "/resourceGroups/{1}" + `
+             "/providers/Microsoft.Storage/storageAccounts/{2}" + `
+             "/blobServices/default/containers/{3}") `
+             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT, "pan-itsfts")
+}
+
+New-AzRoleAssignment @splat
 
 # Generating tokens for acces
 $StartTime = Get-Date
