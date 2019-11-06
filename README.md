@@ -10,10 +10,17 @@ $AZURE_CONTEXT_ACCOUNT_ID = (Get-AzContext).Account.Id
 
 ## Create Resource Group
 ```powershell
+mkdir ./scratch
 $AZURE_APPLICATION_NAME = 'paniplist'
-cp "./templates/resourcegroup/azuredeploy.parameters.json" "./templates/resourcegroup/azuredeploy.$AZURE_APP_NAME.parameters.json"
 
-# Edit "./templates/resourcegroup/azuredeploy.$AZURE_APP_NAME.parameters.json"
+$splat = {}
+$splat = @{
+  Path = "./templates/resourcegroup/azuredeploy.parameters.json"
+  Destination = "./scratch/azuredeploy.${AZURE_APPLICATION_NAME}.resourcegroup.parameters.json"
+}
+Copy-Item @splat
+
+# Edit "./templates/resourcegroup/azuredeploy.$AZURE_APP_NAME.resourcegroup.parameters.json"
 # Fill in correct parameter values
 
 # Deploy a new resource group
@@ -22,23 +29,28 @@ $AZURE_DEPLOYMENT_LOCATION = 'eastus2'
 
 $splat = @{}
 $splat = @{
-  Location = $AZURE_DEPLOYMENT_LOCATION `
+  Location = $AZURE_DEPLOYMENT_LOCATION
   TemplateFile = "./templates/resourcegroup/azuredeploy.json"
-  TemplateParameterFile =  "./templates/resourcegroup/azuredeploy.$AZURE_APP_NAME.parameters.json"
+  TemplateParameterFile =  "./scratch/azuredeploy.${AZURE_APPLICATION_NAME}.resourcegroup.parameters.json"
 }
 $AZURE_RG_DEPLOYMENT = New-AzDeployment @splat
+$AZURE_RESOURCE_GROUP = $AZURE_RG_DEPLOYMENT.Outputs.resourceGroupName.Value
 ```
 
 ## Create Azure Automation Account
 
 ```powershell
 # Create a new Azure Automation Account
-$automationAccount = New-AzAutomationAccount -Name 'panostg-automation' `
-                                             -ResourceGroupName $AZURE_RESOURCE_GROUP `
-                                             -Location $AZURE_DEPLOYMENT_LOCATION `
-                                             -Plan basic
+$splat = @{}
+$splat = @{
+  Name = "$AZURE_APPLICATION_NAME-automation"
+  ResourceGroupName = "$AZURE_RESOURCE_GROUP"
+  Location = "$AZURE_DEPLOYMENT_LOCATION"
+  Plan = "basic"
+}
+$AZURE_AUTOMATION_ACCOUNT = New-AzAutomationAccount @splat
 
-$AZURE_AUTOMATION_ACCOUNT_NAME = $automationAccount.AutomationAccountName
+$AZURE_AUTOMATION_ACCOUNT_NAME = $AZURE_AUTOMATION_ACCOUNT.AutomationAccountName
 ```
 Next, a new **Run as Account** will need to be created.
 
@@ -61,26 +73,32 @@ A corresponding **AzureRunAsConnection** will be created also and can be viewed 
 Once the account has been created, it must be assigned the proper role over the subscription. A Runas Automation account typically posseses `Contributor` over the scope of the subscription. Since this runbook will read information regarding the ip addresses, it will be given `Reader`, instead over a list of managed subscriptions.
 
 ```powershell
-# Get AppId of the automation account.
-$AZURE_AUTOMATION_ACCOUNT_SP = Get-AzADApplication -DisplayNameStartWith $('{0}_' -f $AZURE_AUTOMATION_ACCOUNT_NAME)
+# Get ObjectId of the service principal associated with
+# the Azure Automation RunAs account.
+# When a RunAs account is created, it is registered as an Azure Ad application.
+# An Azure Ad application has an associated Service Principal.
+# The ObjectId of the associated Service Principal is required to assign an Azure AD role.
 
-$AZURE_AUTOMATION_ACCOUNT_SP_APPID = $AZURE_AUTOMATION_ACCOUNT_SP.ApplicationId.Guid
+$AZURE_AUTOMATION_RUNASACCOUNT_SP = Get-AzADServicePrincipal -DisplayNameBeginsWith $('{0}_' -f $AZURE_AUTOMATION_ACCOUNT_NAME)
+
+$AZURE_AUTOMATION_RUNASACCOUNT_SP_OBJID = $AZURE_AUTOMATION_RUNASACCOUNT_SP.Id
 
 # Get all subscriptions that you have access to
 $AZURE_SUBSCRIPTION_IDS = Get-AzSubscription | % {$_.SubscriptionId}
 
 $splat = @{}
 $splat =  @{
-  ApplicationId = $AZURE_AUTOMATION_ACCOUNT_SP_APPID
+  ObjectId = "$AZURE_AUTOMATION_RUNASACCOUNT_SP_OBJID"
   RoleDefinitionName = 'Reader'
 }
 
-$AZURE_SUBSCRIPTION_IDS | % { New-AzRoleAssignment @splat -Scope $('/subscriptions/{0}' -f $_) }
+$AZURE_SUBSCRIPTION_IDS | % {
+  New-AzRoleAssignment @splat -Scope $('/subscriptions/{0}' -f $_)
 }
 
 $splat = @{}
 $splat = @{
-  ObjectId = $AZURE_AUTOMATION_ACCOUNT_SP.ObjectId
+  ObjectId = "$AZURE_AUTOMATION_RUNASACCOUNT_SP_OBJID"
   RoleDefinitionName = 'Contributor'
   Scope = $('/subscriptions/{0}' -f $AZURE_SUBSCRIPTION_ID)
 }
@@ -89,56 +107,113 @@ Remove-AzRoleAssignment @splat
 
 ```
 
+After the automation account has been created, the required `Az` Powershell modules must be added to the automation account.
+
+```powershell
+# Add Necessary Az modules
+# The `Az.Accounts` module must the first module imported into the automation account
+
+Find-Module -Name 'Az.Accounts' | ForEach {
+    New-AzAutomationModule -AutomationAccountName $AZURE_AUTOMATION_ACCOUNT_NAME `
+                           -ResourceGroupName $AZURE_RESOURCE_GROUP `
+                           -ContentLink $('{0}/package/{1}/{2}' -f $_.RepositorySourceLocation, $_.Name, $_.Version) `
+                           -Name $_.Name
+}
+
+# Once this module has been imported, the other required modules are imported
+$AZURE_AUTOMATION_MODULES = @(
+    'Az.Compute',
+    'Az.Network',
+    'Az.Resources',
+    'Az.Storage'
+) | ForEach {Find-Module -Name $_ -Repository PSGallery}
+
+$splat = @{}
+$splat @{
+  AutomationAccountName = "$AZURE_AUTOMATION_ACCOUNT_NAME"
+  ResourceGroupName = "$AZURE_RESOURCE_GROUP"
+  ContentLink = $('{0}/package/{1}/{2}' -f $_.RepositorySourceLocation, $_.Name, $_.Version)
+  Name = $_.Name
+}
+$AZURE_AUTOMATION_MODULES | ForEach {
+    New-AzAutomationModule @splat
+}
+
+# Import runbook:
+$splat = @{}
+$splat = @{
+  Path = ".\runbook\Set-YalePanExternalDynamicIpLists.ps1"
+  ResourceGroupName = "$AZURE_RESOURCE_GROUP"
+  AutomationAccountName = "$AZURE_AUTOMATION_ACCOUNT_NAME"
+  Type = "PowerShell"
+}
+Import-AzAutomationRunbook @splat
+
+# Publish runbook
+Publish-AzAutomationRunbook -Name 'Get-AzDataSensitivityLevel' `
+                            -ResourceGroupName $AZURE_RESOURCE_GROUP `
+                            -AutomationAccountName $AZURE_AUTOMATION_ACCOUNT_NAME
+
+```
 
 ## Create Storage Account
 
-An Azure Storage Account will be created to contain Azure blob storage and Azure table storage for use by the runbook.
+An Azure Storage Account will be created to contain Azure blob storage for the external dynamic IP lists.
 
 ```powershell
 # Create a storage account to park artifacts used by the Automation account
 # Add deployment parameters to existing hashtable specific to Storage
 
-$AZURE_DEPLOYMENT_PARAMETERS = @{
-    ResourceLocation         = '{{ ResourceLocation }}'
-    OwnerSignInName          = '{{ OwnerSignInName }}'
-    ChargingAccount          = '{{ ChargingAccount }}'
-    ApplicationName          = '{{ ApplicationName }}'
-    ApplicationBusinessUnit  = '{{ ApplicationBusinessUnit }}'
-    Environment              = '{{ Environment }}'
-    DataSensitivity          = '{{ DataSensitivity }}'
+$splat = {}
+$splat = @{
+  Path = "./templates/storageaccount/azuredeploy.parameters.json"
+  Destination = "./scratch/azuredeploy.${AZURE_APPLICATION_NAME}.storageaccount.parameters.json"
 }
+Copy-Item @splat
 
-$AZURE_STORAGE_ACCOUNT_DEPLOYMENT_PARAMETERS =  $AZURE_DEPLOYMENT_PARAMETERS + @{
-    SkuName           = 'Standard_LRS'
-    AccountKind       = 'StorageV2'
-    AccessTierDefault = 'Hot'
-    CustomDomain      = ''
+# Edit "./templates/resourcegroup/azuredeploy.$AZURE_APP_NAME.storageaccount.parameters.json"
+# Fill in correct parameter values
+
+
+$splat = @{}
+$splat = @{
+  Name = "storageaccount-$(Get-Date -Format 'yyMMddHHmmm')-deployment"
+  ResourceGroupName = "$AZURE_RESOURCE_GROUP"
+  TemplateFile = "./templates/storageaccount/azuredeploy.json"
+  TemplateParameterFILE = "./scratch/azuredeploy.${AZURE_APPLICATION_NAME}.storageaccount.parameters.json"
 }
-
-$AZURE_DEPLOYMENT = "storageaccount-$(Get-Date -Format 'yyMMddHHmmm')-deployment"
-
-$AZURE_DEPLOYMENT_STORAGE_ACCOUNT = New-AzResourceGroupDeployment -Name $AZURE_DEPLOYMENT `
-                                                          -ResourceGroupName $AZURE_RESOURCE_GROUP `
-                                                          -TemplateFile ./templates/storageaccount/azuredeploy.json `
-                                                          -TemplateParameterFILE ./templates/storageaccount/azuredeploy.$AZURE_APPLICATION_NAME.parameters.json
+$AZURE_DEPLOYMENT_STORAGE_ACCOUNT = New-AzResourceGroupDeployment @splat
 
 $AZURE_STORAGE_ACCOUNT = $AZURE_DEPLOYMENT_STORAGE_ACCOUNT.Outputs.storageAccountName.Value
-$AZURE_STORAGE_KEY = $(Get-AzStorageAccountKey -Name "$AZURE_STORAGE_ACCOUNT" -ResourceGroupName "$AZURE_RESOURCE_GROUP" | ? {$_.KeyName -eq 'key1'}).Value
 
-
+# Azure AD credentials can be used to establish a storage context
 $AZURE_STORAGE_CONTEXT = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT" `
-                        -StorageAccountKey "$AZURE_STORAGE_KEY"
+                        -UseConnectedAccount
 
-# Create container to hold Azure blobs
-New-AzStorageContainer -Context $AZURE_STORAGE_CONTEXT `
-                       -Permission Off `
-                       -Name 'itsft-pan'
+$AZURE_STORAGE_CONTAINER = New-AzStorageContainer -Context $AZURE_STORAGE_CONTEXT `
+                                                  -Permission Off `
+                                                  -Name 'pan-itsfts'
+
+# Set role as Storage Blob Data Owner over the newly created container
+$splat=@{}
+$splat = @{
+  SignInName = $AZURE_CONTEXT_ACCOUNT_ID
+  RoleDefinitionName = "Storage Blob Data Owner"
+  Scope = (("/subscriptions/{0}" + `
+             "/resourceGroups/{1}" + `
+             "/providers/Microsoft.Storage/storageAccounts/{2}" + `
+             "/blobServices/default/containers/{3}") `
+             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT, "pan-itsfts")
+}
+
+New-AzRoleAssignment @splat
+# NB, This will take a few minutes to propogate
 
 $StartTime = Get-Date
 $ExpiryTime = $StartTime.AddYears(1)
 
 $AZURE_STORAGE_SAS_TOKEN = New-AzStorageContainerSASToken -Context $AZURE_STORAGE_CONTEXT `
-                                                          -Name 'itsft-pan' `
+                                                          -Name 'pan-itsts' `
                                                           -Permission rl `
                                                           -StartTime $StartTime `
                                                           -ExpiryTime $ExpiryTime
@@ -182,7 +257,7 @@ Set-AzStorageBlobContent `
  -Properties @{"ContentType" = "text/plain;charset=ansi"}
 
 # Assign the application id of automation account contributor role
-New-AzRoleAssignment -ApplicationId  $AZURE_AUTOMATION_ACCOUNT_SP_APPID `
+New-AzRoleAssignment -ApplicationId  $AZURE_AUTOMATION_RUNASACCOUNT_SP_APPID `
     -RoleDefinitionName "Storage Blob Data Contributor" `
     -Scope  (("/subscriptions/{0}" + `
              "/resourceGroups/{1}" + `
