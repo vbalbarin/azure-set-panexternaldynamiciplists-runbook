@@ -63,6 +63,8 @@ param
     $StorageContainer
 )
 
+#$ROOTDIR = $PSScriptRoot
+$TMPDIR = $(New-TemporaryFile).DirectoryName
 
 #region : PSAzureProfile
 # Connect to Azure AD and obtain an authorized context to access directory information regarding owner
@@ -93,15 +95,13 @@ try {
 
 If (!$SubscriptionIDs) {
   $Subscriptions = @($AzureContext.Subscription)
-} elseif ($SubscriptionIDs -ieq 'all') {
+} elseif ($SubscriptionIDs[0] -ieq 'all') {
   $Subscriptions = Get-AzSubscription
 } else {
   $Subscriptions = $SubscriptionIDs | ForEach-Object {$id = $_; Get-AzSubscription | Where-Object {$_.SubscriptionId -ieq $id}}
 }
 
 function Invoke-Main {
-
-  $temp = $(New-TemporaryFile).DirectoryName
 
   $results = New-Object List[System.Object]
   $ipObjects = @{}
@@ -134,14 +134,15 @@ function Invoke-Main {
 
   $dupes = ($ipObjects.Keys | Where-Object {$_ -match '#'})
   if ($dupes.Count -eq 0) {
+
     Write-Verbose -Message 'Creating external dynamic lists'
-    Write-Verbose -Message "Using $temp directory."
-    @( "$temp/ZoneLists" ) | ForEach-Object { if (!(Test-Path -Path "$_")) {New-Item -ItemType Directory -Path $_} }
+    Write-Verbose -Message "Using $TMPDIR directory."
+    @( "$TMPDIR/ZoneLists" ) | ForEach-Object { if (!(Test-Path -Path "$_")) {New-Item -ItemType Directory -Path $_} }
     $zoneFiles = @(
-      "$temp/ZoneLists/HighSensitivityZone.txt"
-      "$temp/ZoneLists/ModerateSensitivityZone.txt"
-      "$temp/ZoneLists/LowSensitivityZone.txt"
-      "$temp/ZoneLists/NoneSensitivityZone.txt"
+      "$TMPDIR/ZoneLists/HighSensitivityZone.txt"
+      "$TMPDIR/ZoneLists/ModerateSensitivityZone.txt"
+      "$TMPDIR/ZoneLists/LowSensitivityZone.txt"
+      "$TMPDIR/ZoneLists/NoneSensitivityZone.txt"
     )
     $zoneFiles | ForEach-Object {
       $parms = @{
@@ -153,7 +154,7 @@ function Invoke-Main {
     }
     $ipObjects.GetEnumerator() | ForEach-Object {
       $ds = ($_.Value.Split('|')[1])
-      $fn = "$temp/ZoneLists/${ds}SensitivityZone.txt"
+      $fn = "$TMPDIR/ZoneLists/${ds}SensitivityZone.txt"
       $parms = @{
         InputObject = $("{0}/32 {1}" -f $_.Key, $_.Value)
         FilePath = $fn
@@ -167,15 +168,19 @@ function Invoke-Main {
     $AzureStorageContext = New-AzStorageContext -StorageAccountName "$StorageAccount" `
                                                   -UseConnectedAccount
 
-      Get-ChildItem -Recurse "$temp/ZoneLists" | ForEach-Object {
-        $parms = @{
-          File = "$_"
-          Context = $AzureStorageContext
-          Container = $StorageContainer
-          Blob = "$($_.Directory.Name + '/' + $_.Name)"
-          Properties = @{"ContentType" = "text/plain;charset=ansi"}
-        }
-        Set-AzStorageBlobContent @parms -Force
+      # Using list of dir path strings; strange execution environment for automation account
+    # Get-ChildItem -Recurse "$ROOTDIR/ZoneLists" | % {$($_.Directory.Name + '/' + $_.Name)"} returns
+    # "C:\temp\[randomstring]"
+    $zoneFiles | ForEach-Object {
+      $parms = @{
+        File = "$_"
+        Context = $AzureStorageContext
+        Container = $StorageContainer
+        Blob = "$(Get-Item -Path "$_" | % { $_.Directory.Name + '/' + $_.Name })"
+        Properties = @{"ContentType" = "text/plain;charset=ansi"}
+      }
+      Set-AzStorageBlobContent @parms -Force
+
       }
   } else {
     Write-Warning -Message 'No external dynamic IP lists generated. Duplicates found'
