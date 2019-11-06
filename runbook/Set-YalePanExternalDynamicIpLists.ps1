@@ -22,7 +22,7 @@
     blob endpoints.
 
 
-.PARAMETER SubscriptionId
+.PARAMETER SubscriptionIds
     A list of Azure subscription ids from which to create private IP addresses and and assign the DataSensitity
     classification of the VM.
 
@@ -43,7 +43,10 @@ using namespace System.Collections.Generic
 param
 (
     # If not specified, the subscription of the current Azure context.
-    [Parameter(Mandatory=$false)] [String[]] $SubscriptionID   # Subscription ID to look at
+    [Parameter(Mandatory=$False)]
+    [AllowEmptyCollection()]
+    [String[]]
+    $SubscriptionIDs   # SubscriptionIDs to look at
 )
 
 
@@ -58,26 +61,33 @@ try {
                 -TenantId $servicePrincipalConnection.TenantId `
                 -ApplicationId $servicePrincipalConnection.ApplicationId `
                 -CertificateThumbprint $servicePrincipalConnection.CertificateThumbprint 3>&1 2>&1 > $null
+  $AzureContext = Get-AzContext
 } catch {
   if (!$servicePrincipalConnection) {
-      $errorMessage = "Connection $connectionName not found."
+    Write-Warning "Connection $connectionName not found.. Trying current user context..."
+    $AzureContext = Get-AzContext
+    if (!$AzureContext) {
+      $errorMessage = "An Azure connection was not found. An Azure context could not be obtained"
       throw $ErrorMessage
+    }
   } else {
-      Write-Error -Message $_.Exception
-      throw $_.Exception
+    Write-Error -Message $_.Exception
+    throw $_.Exception
   }
 }
 #endregion : PSAzureProfile
 
-If (!$SubscriptionID) {
-  $Subscriptions = @((Get-AzContext).Subscription)
-} elseif ($SubscriptionID -ieq 'all') {
+If (!$SubscriptionIDs) {
+  $Subscriptions = @($AzureContext.Subscription)
+} elseif ($SubscriptionIDs -ieq 'all') {
   $Subscriptions = Get-AzSubscription
 } else {
-  $Subscriptions = $SubscriptionID | ForEach-Object {$id = $_; Get-AzSubscription | Where-Object {$_.SubscriptionId -ieq $id}}
+  $Subscriptions = $SubscriptionIDs | ForEach-Object {$id = $_; Get-AzSubscription | Where-Object {$_.SubscriptionId -ieq $id}}
 }
 
 function Invoke-Main {
+
+  $temp = $(New-TemporaryFile).DirectoryName
 
   $results = New-Object List[System.Object]
   $ipObjects = @{}
@@ -111,11 +121,13 @@ function Invoke-Main {
   $dupes = ($ipObjects.Keys | Where-Object {$_ -match '#'})
   if ($dupes.Count -eq 0) {
     Write-Verbose -Message 'Creating external dynamic lists'
+    Write-Verbose -Message "Using $temp directory."
+    @( "$temp/ZoneLists" ) | ForEach-Object { if (!(Test-Path -Path "$_")) {New-Item -ItemType Directory -Path $_} }
     $zoneFiles = @(
-      './ZoneLists/HighSensitivityZone.txt'
-      './ZoneLists/ModerateSensitivityZone.txt'
-      './ZoneLists/LowSensitivityZone.txt'
-      './ZoneLists/NoneSensitivityZone.txt'
+      "$temp/ZoneLists/HighSensitivityZone.txt"
+      "$temp/ZoneLists/ModerateSensitivityZone.txt"
+      "$temp/ZoneLists/LowSensitivityZone.txt"
+      "$temp/ZoneLists/NoneSensitivityZone.txt"
     )
     $zoneFiles | ForEach-Object {
       $parms = @{
@@ -127,7 +139,7 @@ function Invoke-Main {
     }
     $ipObjects.GetEnumerator() | ForEach-Object {
       $ds = ($_.Value.Split('|')[1])
-      $fn = "./ZoneLists/${ds}SensitivityZone.txt"
+      $fn = "$temp/ZoneLists/${ds}SensitivityZone.txt"
       $parms = @{
         InputObject = $("{0}/32 {1}" -f $_.Key, $_.Value)
         FilePath = $fn
