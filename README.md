@@ -209,6 +209,20 @@ $splat = @{
 New-AzRoleAssignment @splat
 # NB, This will take a few minutes to propogate
 
+# Test by repeating the followinng until success
+
+Set-AzStorageBlobContent `
+  -Context $AZURE_STORAGE_CONTEXT `
+  -Container 'pan-itsfts' `
+  -File "./templates/resourcegroup/azuredeploy.json" `
+  -Blob 'templates/resourcegroup/azuredeploy.json' `
+  -Properties @{"ContentType" = "text/plain;charset=ansi"}
+
+# You can run the runbook here to populate the blobs and test locally
+
+./runbook/Set-YalePanExternalDynamicIpLists.ps1 -SubscriptionIds @('all') -StorageAccount "$AZURE_STORAGE_ACCOUNT" -StorageContainer 'pan-itsfts' -Verbose
+
+# Generating tokens for acces
 $StartTime = Get-Date
 $ExpiryTime = $StartTime.AddYears(1)
 
@@ -218,43 +232,9 @@ $AZURE_STORAGE_SAS_TOKEN = New-AzStorageContainerSASToken -Context $AZURE_STORAG
                                                           -StartTime $StartTime `
                                                           -ExpiryTime $ExpiryTime
 
-$AZURE_FTS_PAN_CONFIGS=$(Get-ChildItem -Recurse "$HOME/Downloads/itsft-pan/ZoneLists")
-
-$AZURE_FTS_PAN_CONFIGS | % { Set-AzStorageBlobContent -File $_ `
-                                                      -Context $AZURE_STORAGE_CONTEXT `
-                                                      -Container 'itsft-pan' `
-                                                      -Blob $($_.Directory.Name + '/' + $_.Name) `
-                                                      -Properties @{"ContentType" = "text/plain;charset=ansi"}
-                              }
-
 ```
 
 ```
-
-
-$AZURE_AAD_STORAGE_CONTEXT = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT" `
-                                        -UseConnectedAccount
-
-# Assign current logged in user the Storage Blob Data Owner role
-New-AzRoleAssignment -SignInName  $AZURE_CONTEXT_ACCOUNT_ID `
-    -RoleDefinitionName "Storage Blob Data Owner" `
-    -Scope  (("/subscriptions/{0}" + `
-             "/resourceGroups/{1}" + `
-             "/providers/Microsoft.Storage/storageAccounts/{2}" + `
-             "/blobServices/default/containers/{3}") `
-             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT, "itsft-pan")
-
-# Create a new storage context using current logged in user
-$AZURE_AAD_STORAGE_CONTEXT = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT" `
-                                        -UseConnectedAccount
-
-# Test uploading data
-Set-AzStorageBlobContent `
- -Context $AZURE_AAD_STORAGE_CONTEXT `
- -Container itsft-pan `
- -File /Users/vbalbarin/projects/git.yale.edu/veb3/Azure/Yale-Azure-Zonelists/HighSensitivityZone.txt `
- -Blob 'ZoneLists/HighSensitivityZone.txt' `
- -Properties @{"ContentType" = "text/plain;charset=ansi"}
 
 # Assign the application id of automation account contributor role
 New-AzRoleAssignment -ApplicationId  $AZURE_AUTOMATION_RUNASACCOUNT_SP_APPID `
