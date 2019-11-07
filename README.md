@@ -146,11 +146,12 @@ $splat = @{
   ResourceGroupName = "$AZURE_RESOURCE_GROUP"
   AutomationAccountName = "$AZURE_AUTOMATION_ACCOUNT_NAME"
   Type = "PowerShell"
+  LogVerbose = $True
 }
-Import-AzAutomationRunbook @splat
+Import-AzAutomationRunbook @splat -Force
 
 # Publish runbook
-Publish-AzAutomationRunbook -Name 'Get-AzDataSensitivityLevel' `
+Publish-AzAutomationRunbook -Name 'Set-YalePanExternalDynamicIpLists' `
                             -ResourceGroupName $AZURE_RESOURCE_GROUP `
                             -AutomationAccountName $AZURE_AUTOMATION_ACCOUNT_NAME
 
