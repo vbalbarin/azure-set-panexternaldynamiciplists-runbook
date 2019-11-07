@@ -118,7 +118,7 @@ function Invoke-Main {
     $comment = '#{0}|{1}|{2}' -f $_.Properties.AttachedVmName, $_.Properties.DataSensitivity, $_.Properties.AttachedToVnet
     $key = $_.Address
     if ($ipObjects.ContainsKey($key)) {
-      Write-Warning -Message $('Duplicate: {0} {1}' -f $key, $comment)
+      Write-Error -Message $('Duplicate: {0} {1}' -f $key, $comment)
       # Adding `#` prefix to IP address; if it is written to file, it will be
       # interpreted as comment.
       # Create new entry from first instance found. Append NOTE to comment
@@ -182,11 +182,30 @@ function Invoke-Main {
       Set-AzStorageBlobContent @parms -Force
 
       }
-  } else {
-    Write-Warning -Message 'No external dynamic IP lists generated. Duplicates found'
-    Write-Warning -Message 'Remove duplicate IP addresses in Azure Portal and run scripts again'
-    $dupes | ForEach-Object {Write-Warning -Message $($_ + ' ' + $ipObjects[$_])}
-  }
+    } else {
+      Write-Error -Message 'No external dynamic IP lists generated. Duplicates found'
+      @( "$TMPDIR/ZoneLists" ) | ForEach-Object { if (!(Test-Path -Path "$_")) {New-Item -ItemType Directory -Path $_} }
+      $fn = "$TMPDIR/ZoneLists/ErrorDuplicateIPs.txt"
+      $parms = @{
+        InputObject = $("# Generated $(Get-Date), $((Get-AzContext).Account.Id)\n# Duplicate IPs")
+        FilePath = "$fn"
+        Encoding = 'ascii'
+      }
+      Out-File @parms
+
+      $dupes | ForEach-Object {
+        #Write-Error -Message $($_ + ' ' + $ipObjects[$_])
+        $parms = @{
+          InputObject = $($_ + ' ' + $ipObjects[$_])
+          FilePath = "$fn"
+          Encoding = 'ascii'
+          Append = $true
+        }
+        Out-File @parms
+        Write-Error -Message "Review contents of $fn"
+        Write-Error -Message 'Remove duplicate IP addresses in Azure Portal and run script again'
+      }
+    }
 
 }
 
