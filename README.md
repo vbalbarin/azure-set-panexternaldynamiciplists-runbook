@@ -188,12 +188,12 @@ $AZURE_DEPLOYMENT_STORAGE_ACCOUNT = New-AzResourceGroupDeployment @splat
 $AZURE_STORAGE_ACCOUNT_NAME = $AZURE_DEPLOYMENT_STORAGE_ACCOUNT.Outputs.storageAccountName.Value
 
 # Azure AD credentials can be used to establish a storage context
-$AZURE_STORAGE_CONTEXT = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT_NAME" `
+$AZURE_STORAGE_CONTEXT_AAD = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT_NAME" `
                         -UseConnectedAccount
 
 $AZURE_STORAGE_CONTAINER_NAME = 'pan-itsfts'
 
-$AZURE_STORAGE_CONTAINER = New-AzStorageContainer -Context $AZURE_STORAGE_CONTEXT `
+$AZURE_STORAGE_CONTAINER = New-AzStorageContainer -Context $AZURE_STORAGE_CONTEXT_AAD `
                                                   -Permission Off `
                                                   -Name "$AZURE_STORAGE_CONTAINER_NAME"
 
@@ -215,7 +215,7 @@ New-AzRoleAssignment @splat
 # Test by repeating the followinng until success
 
 Set-AzStorageBlobContent `
-  -Context $AZURE_STORAGE_CONTEXT `
+  -Context $AZURE_STORAGE_CONTEXT_AAD `
   -Container "$AZURE_STORAGE_CONTAINER_NAME" `
   -File "./templates/resourcegroup/azuredeploy.json" `
   -Blob 'templates/resourcegroup/azuredeploy.json' `
@@ -238,27 +238,50 @@ $splat = @{
 }
 
 New-AzRoleAssignment @splat
+```
 
-# Generating tokens for acces
+```powershell
+# To create Shared Access tokens, the account key, not AAD, context must be used
+
+$AZURE_STORAGE_KEY = $(Get-AzStorageAccountKey -Name "$AZURE_STORAGE_ACCOUNT_NAME" -ResourceGroupName "$AZURE_RESOURCE_GROUP" | ? {$_.KeyName -eq 'key1'}).Value
+
+$AZURE_STORAGE_CONTEXT = New-AzStorageContext -StorageAccountName "$AZURE_STORAGE_ACCOUNT_NAME" `
+                        -StorageAccountKey "$AZURE_STORAGE_KEY"
+
+# Create Shared Access Tokens for use by the PaloAlto
+# Create 1 year expiry date from now
+
 $StartTime = Get-Date
 $ExpiryTime = $StartTime.AddYears(1)
 
-$AZURE_STORAGE_SAS_TOKEN = New-AzStorageContainerSASToken -Context $AZURE_STORAGE_CONTEXT `
-                                                          -Name 'pan-itsts' `
-                                                          -Permission rl `
-                                                          -StartTime $StartTime `
-                                                          -ExpiryTime $ExpiryTime
 
-```
+# **NB**, RECORD THIS VALUE IN A A SECRET VAULT. IF LOST, IT MUST BE REGENERATED.
+#$AZURE_STORAGE_SAS_TOKEN = New-AzStorageContainerSASToken @splat
 
-```
+$AZURE_PAN_EDL_BLOBS = Get-AzStorageBlob -Container $AZURE_STORAGE_CONTAINER_NAME -Context $AZURE_STORAGE_CONTEXT -Prefix 'ZoneLists'
 
-# Assign the application id of automation account contributor role
-New-AzRoleAssignment -ApplicationId  $AZURE_AUTOMATION_RUNASACCOUNT_SP_APPID `
-    -RoleDefinitionName "Storage Blob Data Contributor" `
-    -Scope  (("/subscriptions/{0}" + `
-             "/resourceGroups/{1}" + `
-             "/providers/Microsoft.Storage/storageAccounts/{2}" + `
-             "/blobServices/default/containers/{3}") `
-             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT_NAME, "itsft-pan")
+$splat = @{}
+$splat = @{
+  Context = $AZURE_STORAGE_CONTEXT
+  Container = "$AZURE_STORAGE_CONTAINER_NAME"
+  Permission = 'rl'
+  StartTime = $StartTime
+  ExpiryTime = $ExpiryTime
+}
+
+$AZURE_PAN_EDL_BLOBS = Get-AzStorageBlob -Container $AZURE_STORAGE_CONTAINER_NAME `
+                      -Context $AZURE_STORAGE_CONTEXT `
+                      -Prefix 'ZoneLists'
+
+$AZURE_BLOB_SASTOKENS = $AZURE_PAN_EDL_BLOBS | ForEach-Object {
+  $uri = $_.ICloudBlob.StorageUri.PrimaryUri.AbsoluteUri
+  $sASToken = New-AzStorageBlobSASToken @splat -Blob $_.Name
+  $("{0}{1}" -f $uri, $sASToken)
+}
+
+Out-File $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Encoding ascii
+
+# This file contains the uri and access tokens for the external data list files.
+# Keep this safe.
+
 ```
