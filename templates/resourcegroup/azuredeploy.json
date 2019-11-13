@@ -41,11 +41,11 @@
             "metadata": {
                 "description": "A string that identifies the institutional business unit or academic department served by he product or function of the application to be placed into Azure",
                 "comment": "Institutional Property"
-            }            
+            }
         },
         "Environment": {
             "type": "string",
-            "allowedValues": [ "dev", "test", "prod", "Dev", "Test", "Prod" ],
+            "allowedValues": [ "dev", "test", "prod"],
             "metadata": {
                 "description": "The application or workload environment. Available values are dev, test and prod.",
                 "comment": "Institutional Property"
@@ -54,7 +54,7 @@
         "DataSensitivity": {
             "type": "string",
             "defaultValue": "none",
-            "allowedValues": [ "High", "Moderate", "Low", "None", "high", "moderate", "low", "none" ],
+            "allowedValues": [ "High", "Moderate", "Low", "None" ],
             "metadata": {
                 "description": "A string that denotes the degree of risk and impact to the institution should data handled by the resource be disclosed outside of the institution [ref](https://cybersecurity.yale.edu/classifyingtechnology).",
                 "comment": "Institutional Property"

@@ -44,11 +44,11 @@
             "metadata": {
                 "description": "A string that identifies the institutional business unit or academic department served by he product or function of the application to be placed into Azure",
                 "comment": "Institutional Property"
-            }            
+            }
         },
         "Environment": {
             "type": "string",
-            "allowedValues": [ "dev", "test", "prod", "Dev", "Test", "Prod" ],
+            "allowedValues": [ "dev", "test", "prod"],
             "metadata": {
                 "description": "The application or workload environment. Available values are dev, test and prod.",
                 "comment": "Institutional Property"
@@ -57,13 +57,13 @@
         "DataSensitivity": {
             "type": "string",
             "defaultValue": "none",
-            "allowedValues": [ "High", "Moderate", "Low", "None", "high", "moderate", "low", "none" ],
+            "allowedValues": [ "High", "Moderate", "Low", "None" ],
             "metadata": {
                 "description": "A string that denotes the degree of risk and impact to the institution should data handled by the resource be disclosed outside of the institution [ref](https://cybersecurity.yale.edu/classifyingtechnology).",
                 "comment": "Institutional Property"
             }
         },
-        "SkuName" : { 
+        "SkuName" : {
             "type": "string",
             "allowedValues": [ "Standard_LRS", "Standard_GRS", "Standard_RAGRS", "Standard_ZRS", "Premium_LRS" ],
             "defaultValue": "Standard_LRS",
@@ -71,8 +71,8 @@
                 "description": "Specifies storage account product (Standard vs Premium) and replication/availability service level (Local, Zone, Geographic, or Read Access/Geographic redundancy). The least expensive option is Standard_LRS (Standard Local Redundant Storage) and is the default selected by the institution for general usage. The contents of a Standard_LRS account are replicated across the storage nodes in a single fault domain (equipment rack/unit) in a datacenter. Premium_LRS (Premium Local Storage is intended for VMs with demanding IO requirements."
             }
         },
-        "AccountKind" : { 
-            "type": "string", 
+        "AccountKind" : {
+            "type": "string",
             "allowedValues": [ "StorageV2", "Storage", "BlobStorage" ],
             "defaultValue": "StorageV2",
             "metadata": {
@@ -115,7 +115,7 @@
         }
     },
 
-    "resources": [        
+    "resources": [
     {
         "name": "[variables('storageAccount')]",
         "type": "Microsoft.Storage/storageAccounts",
@@ -138,10 +138,10 @@
         },
 
         "tags": "[variables('storageAccountTags')]"
-    }  
+    }
     ],
-    
-    "outputs": { 
+
+    "outputs": {
         "storageAccountName": {
             "type": "string",
             "value": "[variables('storageAccount')]"
