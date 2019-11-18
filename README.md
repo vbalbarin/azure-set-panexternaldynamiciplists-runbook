@@ -285,3 +285,15 @@ Out-File $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Encoding ascii
 # Keep this safe.
 
 ```
+
+
+```powershell
+$AZURE_WORKSPACE_DEPLOYMENT = New-AzResourceGroupDeployment -TemplateFile ./templates/opinsightworkspace/azuredeploy.json -TemplateParameterFile ./scratch/azuredeploy.workspace.parameters.json -ResourceGroupName $AZURE_RESOURCE_GROUP
+
+$AZURE_WORKSPACE_RESOURCEID = $AZURE_WORKSPACE_DEPLOYMENT.Outputs.resourceId.Value
+
+$AZURE_AUTOMATION_ACCOUNT_RESOURCEID = (Get-AzResource -ResourceType "Microsoft.Automation/automationAccounts" -Name "$AZURE_APPLICATION_NAME-automation").ResourceId
+
+Set-AzDiagnosticSetting -ResourceId "$AZURE_AUTOMATION_ACCOUNT_RESOURCEID" -WorkspaceId "$AZURE_WORKSPACE_RESOURCEID" -Enabled 1
+
+```
