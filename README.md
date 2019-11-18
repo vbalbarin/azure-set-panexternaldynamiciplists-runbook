@@ -129,14 +129,14 @@ $AZURE_AUTOMATION_MODULES = @(
 ) | ForEach {Find-Module -Name $_ -Repository PSGallery}
 
 $splat = @{}
-$splat @{
+$splat = @{
   AutomationAccountName = "$AZURE_AUTOMATION_ACCOUNT_NAME"
   ResourceGroupName = "$AZURE_RESOURCE_GROUP"
-  ContentLink = $('{0}/package/{1}/{2}' -f $_.RepositorySourceLocation, $_.Name, $_.Version)
-  Name = $_.Name
 }
 $AZURE_AUTOMATION_MODULES | ForEach {
-    New-AzAutomationModule @splat
+    New-AzAutomationModule @splat `
+    -ContentLink "$('{0}/package/{1}/{2}' -f $_.RepositorySourceLocation, $_.Name, $_.Version)" `
+    -Name $_.Name
 }
 
 # Import runbook:
