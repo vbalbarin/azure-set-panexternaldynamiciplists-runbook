@@ -37,7 +37,6 @@ using namespace System.Collections.Generic
 
 param
 (
-  [Parameter(ParameterSetName="WebHookData")]
   [Object]
   $WebHookData
 )
@@ -90,7 +89,7 @@ if ($WebHookData) {
   $StorageAccount = $parametersFromBody.StorageAccount
   $StorageContainer = $parametersFromBody.StorageContainer
 } else {
-  Write-Error 'No webhook furnished'
+  Throw 'No webhook furnished'
 }
 
 #region : PSAzureProfile
@@ -111,11 +110,11 @@ try {
     $AzureContext = Get-AzContext
     if (!$AzureContext) {
       $errorMessage = "An Azure connection was not found. An Azure context could not be obtained"
-      throw $ErrorMessage
+    Throw $ErrorMessage
     }
   } else {
     Write-Error -Message $_.Exception
-    throw $_.Exception
+    Throw $_.Exception
   }
 }
 #endregion : PSAzureProfile
@@ -231,6 +230,7 @@ function Invoke-Main {
         Out-File @parms
         Write-Error -Message "Review contents of $fn"
         Write-Error -Message 'Remove duplicate IP addresses in Azure Portal and run script again'
+        Throw "No external dynamic IP lists generated. Duplicates found"
       }
     }
 
