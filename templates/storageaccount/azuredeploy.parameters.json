@@ -11,7 +11,8 @@
     "ResourceLocation": {"value": "{{ ResourceLocation}}"},
     "ApplicationName": { "value": "{{ ApplicationName}}" },
     "ApplicationBusinessUnit": {"value": "{{ ApplicationBusinessUnit }}"},
-    "Environment": { "value": "{{ Environment }}" }
+    "Environment": { "value": "{{ Environment }}" },
+    "DataSensitivity": { "value": "{{ DataSensitivity }}"}
 
   }
 }
