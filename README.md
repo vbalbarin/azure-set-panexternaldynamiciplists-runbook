@@ -142,16 +142,16 @@ $AZURE_AUTOMATION_MODULES | ForEach {
 # Import runbook:
 $splat = @{}
 $splat = @{
-  Path = ".\runbook\Set-YalePanExternalDynamicIpLists.ps1"
+  Path = ".\runbook\webhook-version\Set-YalePanExternalDynamicIpLists.ps1"
   ResourceGroupName = "$AZURE_RESOURCE_GROUP"
   AutomationAccountName = "$AZURE_AUTOMATION_ACCOUNT_NAME"
   Type = "PowerShell"
   LogVerbose = $True
 }
-Import-AzAutomationRunbook @splat -Force
+$AZURE_RUNBOOK = Import-AzAutomationRunbook @splat -Force
 
 # Publish runbook
-Publish-AzAutomationRunbook -Name 'Set-YalePanExternalDynamicIpLists' `
+Publish-AzAutomationRunbook -Name $AZURE_RUNBOOK.Name `
                             -ResourceGroupName $AZURE_RESOURCE_GROUP `
                             -AutomationAccountName $AZURE_AUTOMATION_ACCOUNT_NAME
 
