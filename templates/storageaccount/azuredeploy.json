@@ -1,5 +1,5 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "comment": "This Azure Resource Managemer template creates an Azure Storage Account. It enforces conventions regarding the resource name and its tags.",
@@ -97,10 +97,11 @@
   },
 
   "variables": {
+    "subscriptionIdHash": "[uniqueString(split(subscription().id, '/')[2])]",
     "baseString": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'))]",
-    "resourceGroupName": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'), '-rg')]",
+    "resourceGroupName": "[concat(variables('baseString'), '-rg')]",
     "resourceLocation": "[if(equals(parameters('ResourceLocation'), ''), resourceGroup().location, parameters('ResourceLocation'))]",
-    "name": "[concat(variables('baseString'), '-storage')]",
+    "name": "[concat(variables('baseString'), '-', variables('subscriptionIdHash'), '-storage')]",
     "storageAccount": "[concat('yale', uniqueString(variables('name')))]",
     "skuName": "[parameters('SkuName')]",
     "accountKind": "[parameters('AccountKind')]",
