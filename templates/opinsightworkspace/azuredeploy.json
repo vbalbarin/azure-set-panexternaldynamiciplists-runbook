@@ -1,5 +1,5 @@
 {
-  "$schema": "https://schema.management.azure.com/schemas/2014-04-01-preview/deploymentTemplate.json#",
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
 
   "parameters": {
@@ -71,12 +71,13 @@
     "resourceGroupName": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'), '-rg')]",
     "workspaceName": "[concat(parameters('ApplicationName'), '-', uniqueString(variables('resourceGroupName')))]",
     "resourceLocation": "[parameters('ResourceLocation')]",
+    "resourceGroupTags": "[resourceGroup().tags]",
     "resourceTags": {
       "Application": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'))]",
       "OwnerDepartmentContact": "[parameters('OwnerSignInName')]",
       "DataSensitivity": "[parameters('DataSensitivity')]",
       "ChargingAccount": "[parameters('ChargingAccount')]",
-      "Name": "[variables('resourceGroupName')]"
+      "Name": "[variables('workspaceName')]"
     }
   },
 
@@ -93,5 +94,24 @@
         }
       }
     }
-  ]
+  ],
+
+  "outputs": {
+    "workspaceName": {
+      "type": "string",
+      "value": "[variables('workspaceName')]"
+    },
+    "resourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workspaceName'))]"
+    },
+    "tags": {
+      "type": "object",
+      "value": "[variables('resourceTags')]"
+    },
+    "resourceGroupTags": {
+      "type": "object",
+      "value": "[variables('resourceGroupTags')]"
+    }
+  }
 }
