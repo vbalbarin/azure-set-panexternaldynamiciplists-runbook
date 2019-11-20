@@ -206,7 +206,7 @@ $splat = @{
              "/resourceGroups/{1}" + `
              "/providers/Microsoft.Storage/storageAccounts/{2}" + `
              "/blobServices/default/containers/{3}") `
-             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT_NAME, $AZURE_STORAGE_CONTAINER)
+             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT_NAME, $AZURE_STORAGE_CONTAINER_NAME)
 }
 
 New-AzRoleAssignment @splat
@@ -222,10 +222,38 @@ Set-AzStorageBlobContent `
   -Properties @{"ContentType" = "text/plain;charset=ansi"}
 
 # You can run the runbook here to populate the blobs and test locally
+# Powershell runbooks driven by events or schedules take a single parameter:
+# `-Webhook`
+# This is a JSON payload that serializes the Powershell parameters.
+# Two versions of the script are furnished:
+# 1. A version that utiliizes conventional Powershell commandlet parameters and is intended to be executed interactively. These are furnished in the task blade.
+# 2. A version that wraps these parameters as a webhook to be delivered by a scheduled event or Logic App step.
+# Since this will run as a scheduled event we will import the webhook version.
+# We will test this version locally.
 
-./runbook/Set-YalePanExternalDynamicIpLists.ps1 -SubscriptionIds @('all') -StorageAccount "$AZURE_STORAGE_ACCOUNT_NAME" -StorageContainer "$AZURE_STORAGE_CONTAINER_NAME" -Verbose
+# Grab all of the Subscription Ids to which the runbook automation was assigned a reader role
+$AZURE_SUBSCRIPTION_IDS = $(Get-AzSubscription).Id
 
-# Set Storage Blob Contributor role for RunAs account to allow the runbook to update blobs
+# Construct the test webhook payload by dot source the payload script:
+. ./runbook/webhook-version/Set-TestWebhookVariable.ps1
+
+# Check that SubscriptionIds, StorageAccount, and StorageContainer have correct values:
+$testWebhook.RequestBody
+
+./runbook/webhook-version/Set-YalePanExternalDynamicIpLists.ps1 -Webhook $testWebhook -Verbose
+
+# Test
+
+# Nonwebhook version:
+# ./runbook/nonwebhook-version/Set-YalePanExternalDynamicIpLists.ps1 -SubscriptionIds @('all') `
+#                                            -StorageAccount "$AZURE_STORAGE_ACCOUNT_NAME" `
+#                                            -StorageContainer "$AZURE_STORAGE_CONTAINER_NAME" #`
+#                                            -Verbose
+
+# This script was executed under our current logged in AAD context and we have ownership over
+# the storage account blobs.
+
+# We must set Storage Blob Contributor role for RunAs account to allow the runbook to update blobs
 $splat=@{}
 $splat = @{
   ObjectId = "$AZURE_AUTOMATION_RUNASACCOUNT_SP_OBJID"
