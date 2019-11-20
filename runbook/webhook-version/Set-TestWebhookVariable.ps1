@@ -17,7 +17,7 @@ $AZURE_STORAGE_ACCOUNT_NAME
 AZURE_STORAGE_CONTAINER_NAME
 ```
 #>
-Remove-Variable -Name testWebhook
+Remove-Variable -Name testWebhook -Force -ErrorAction Ignore
 
 $testWebhook = [PsCustomObject] @{
   WebhookName =  'TestWebhook'
