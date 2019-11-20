@@ -68,8 +68,11 @@
   },
 
   "variables": {
-    "resourceGroupName": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'), '-rg')]",
-    "workspaceName": "[concat(parameters('ApplicationName'), '-', uniqueString(variables('resourceGroupName')))]",
+    "subscriptionIdHash": "[uniqueString(split(subscription().id, '/')[2])]",
+    "baseString": "[concat(parameters('ApplicationName'), '-', parameters('ApplicationBusinessUnit'), '-', parameters('Environment'), '-', parameters('ResourceLocation'))]",
+    "resourceGroupName": "[concat(variables('baseString'), '-rg')]",
+    "name": "[concat(variables('baseString'), '-', variables('subscriptionIdHash'), '-workspace')]",
+    "workspaceName": "[concat('workspace', uniqueString(variables('name')))]",
     "resourceLocation": "[parameters('ResourceLocation')]",
     "resourceGroupTags": "[resourceGroup().tags]",
     "resourceTags": {
@@ -77,7 +80,7 @@
       "OwnerDepartmentContact": "[parameters('OwnerSignInName')]",
       "DataSensitivity": "[parameters('DataSensitivity')]",
       "ChargingAccount": "[parameters('ChargingAccount')]",
-      "Name": "[variables('workspaceName')]"
+      "Name": "[variables('name')]"
     }
   },
 
