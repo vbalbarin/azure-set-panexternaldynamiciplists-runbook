@@ -316,7 +316,21 @@ Out-File $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Encoding ascii
 
 
 ```powershell
-$AZURE_WORKSPACE_DEPLOYMENT = New-AzResourceGroupDeployment -TemplateFile ./templates/opinsightworkspace/azuredeploy.json -TemplateParameterFile ./scratch/azuredeploy.workspace.parameters.json -ResourceGroupName $AZURE_RESOURCE_GROUP
+$splat = {}
+$splat = @{
+  Path = "./templates/opinsightworkspace/azuredeploy.parameters.json"
+  Destination = "./scratch/azuredeploy.${AZURE_APPLICATION_NAME}.workspace.parameters.json"
+}
+Copy-Item @splat
+
+$splat= {}
+$splat = @{
+  TemplateFile = "./templates/opinsightworkspace/azuredeploy.json"
+  TemplateParameterFile = "./scratch/azuredeploy.workspace.parameters.json"
+  ResourceGroupName = "$AZURE_RESOURCE_GROUP"
+}
+
+$AZURE_WORKSPACE_DEPLOYMENT = New-AzResourceGroupDeployment @splat
 
 $AZURE_WORKSPACE_RESOURCEID = $AZURE_WORKSPACE_DEPLOYMENT.Outputs.resourceId.Value
 
