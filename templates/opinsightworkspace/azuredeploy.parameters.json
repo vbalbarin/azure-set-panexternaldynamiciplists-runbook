@@ -1,0 +1,14 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+
+    "parameters": {
+        "ResourceLocation": {"value": "{{ ResourceLocation }}"},
+        "OwnerSigninName": {"value": "{{ OwnerSigninName }}"},
+        "ChargingAccount": { "value": "{{ ChargingAccount }}" },
+        "ApplicationName": { "value": "{{ ApplicationName }}" },
+        "ApplicationBusinessUnit": {"value": "{{ ApplicationBusinessUnit }}"},
+        "Environment": { "value": "{{ Environment }}" },
+        "DataSensitivity": { "value": "{{ DataSensitivity }}"}
+      }
+  }
