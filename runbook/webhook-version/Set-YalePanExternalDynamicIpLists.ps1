@@ -79,6 +79,10 @@ $PAYLOAD_SCHEMA = @'
 
 
 if ($WebHookData) {
+  if (-not $WebHookData.RequestBody) {
+    Write-Verbose -Message "Receiving input from test pane."
+    $WebhookData = (ConvertFrom-JSON -InputObject $WebhookData)
+  }
   $name = $WebHookData.WebhookName
   $headers = $WebHookData.RequestHeader
   $body = $WebHookData.RequestBody
