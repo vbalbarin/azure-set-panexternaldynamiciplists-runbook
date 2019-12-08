@@ -149,9 +149,10 @@ $splat = @{
   LogVerbose = $True
 }
 $AZURE_RUNBOOK = Import-AzAutomationRunbook @splat -Force
+$AZURE_RUNBOOK_NAME = $AZURE_RUNBOOK.Name
 
 # Publish runbook
-Publish-AzAutomationRunbook -Name $AZURE_RUNBOOK.Name `
+Publish-AzAutomationRunbook -Name $AZURE_RUNBOOK_NAME `
                             -ResourceGroupName $AZURE_RESOURCE_GROUP `
                             -AutomationAccountName $AZURE_AUTOMATION_ACCOUNT_NAME
 
@@ -314,6 +315,42 @@ Out-File -InputObject $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Enc
 
 ```
 
+```powershell
+# Create webhook for runbook
+$splat = @{}
+$splat = @{
+  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+  ResourceGroupName     = $AZURE_RESOURCE_GROUP
+  RunbookName           = $AZURE_RUNBOOK_NAME
+  Name                  = "$AZURE_RUNBOOK_NAME-webhook"
+  IsEnabled             = $true
+  ExpiryTime            = (get-date).AddYears(5)
+  Force                 = $true
+}
+
+$AZURE_AUTOMATION_WEBHOOK = New-AzAutomationWebhook @splat
+
+# Create runbook schedule
+$splat = @{}
+$splat = @{
+  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+  Name = "SetPanEDList"
+  StartTime = "12/07/2019 21:05:00"
+  HourInterval = 1
+  ResourceGroupName = $AZURE_RESOURCE_GROUP
+}
+
+New-AzAutomationSchedule @splat
+
+$splat = @{}
+$splat = @{
+  Name = "SetPanEDList_Scheduled"
+  ScheduleName = "SetPanEDList"
+  ResourceGroupName = $AZURE_RESOURCE_GROUP
+  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+}
+Register-AzAutomationScheduledRunbook @splat
+```
 
 ```powershell
 $splat = {}
@@ -336,6 +373,6 @@ $AZURE_WORKSPACE_RESOURCEID = $AZURE_WORKSPACE_DEPLOYMENT.Outputs.resourceId.Val
 
 $AZURE_AUTOMATION_ACCOUNT_RESOURCEID = (Get-AzResource -ResourceType "Microsoft.Automation/automationAccounts" -Name "$AZURE_APPLICATION_NAME-automation").ResourceId
 
-Set-AzDiagnosticSetting -ResourceId "$AZURE_AUTOMATION_ACCOUNT_RESOURCEID" -WorkspaceId "$AZURE_WORKSPACE_RESOURCEID" -Enabled 1
+Set-AzDiagnosticSetting -ResourceId "$AZURE_AUTOMATION_ACCOUNT_RESOURCEID" -WorkspaceId "$AZURE_WORKSPACE_RESOURCEID" -Enabled $true
 
 ```
