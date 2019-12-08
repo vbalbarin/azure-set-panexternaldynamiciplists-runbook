@@ -329,7 +329,10 @@ $splat = @{
 }
 
 $AZURE_AUTOMATION_WEBHOOK = New-AzAutomationWebhook @splat
+# NB, record $AZURE_AUTOMATION_WEBHOOK.uri; if lost must be regenerated
+```
 
+```powershell
 # Create runbook schedule
 $splat = @{}
 $splat = @{
