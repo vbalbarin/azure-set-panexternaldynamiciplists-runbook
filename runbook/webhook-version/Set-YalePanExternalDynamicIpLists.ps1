@@ -86,7 +86,8 @@ if ($WebHookData) {
   $name = $WebHookData.WebhookName
   $headers = $WebHookData.RequestHeader
   $body = $WebHookData.RequestBody
-  Test-Json -Json $body -Schema $PAYLOAD_SCHEMA
+  # Commenting this out for runbook; this commandlet doesn't exist in Azure Automation Runbook environment
+  # est-Json -Json $body -Schema $PAYLOAD_SCHEMA
   # retrieve correct values
   $parametersFromBody = (ConvertFrom-Json -InputObject $body)
   $SubscriptionIDs = $parametersFromBody.SubscriptionIds
