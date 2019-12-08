@@ -262,7 +262,7 @@ $splat = @{
              "/resourceGroups/{1}" + `
              "/providers/Microsoft.Storage/storageAccounts/{2}" + `
              "/blobServices/default/containers/{3}") `
-             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT_NAME, "pan-itsfts")
+             -f $AZURE_SUBSCRIPTION_ID, $AZURE_RESOURCE_GROUP, $AZURE_STORAGE_ACCOUNT_NAME, $AZURE_STORAGE_CONTAINER_NAME )
 }
 
 New-AzRoleAssignment @splat
@@ -307,7 +307,7 @@ $AZURE_BLOB_SASTOKENS = $AZURE_PAN_EDL_BLOBS | ForEach-Object {
   $("{0}{1}" -f $uri, $sASToken)
 }
 
-Out-File $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Encoding ascii
+Out-File -InputObject $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Encoding ascii
 
 # This file contains the uri and access tokens for the external data list files.
 # Keep this safe.
