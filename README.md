@@ -236,12 +236,12 @@ Set-AzStorageBlobContent `
 $AZURE_SUBSCRIPTION_IDS = $(Get-AzSubscription).Id
 
 # Construct the test webhook payload by dot source the payload script:
-. ./runbook/webhook-version/Set-TestWebhookVariable.ps1
+. ./runbook/webhook-version/Set-TestWebhookDataVariable.ps1
 
 # Check that SubscriptionIds, StorageAccount, and StorageContainer have correct values:
-$testWebhook.RequestBody
+$testWebhookData.RequestBody
 
-./runbook/webhook-version/Set-YalePanExternalDynamicIpLists.ps1 -Webhook $testWebhook -Verbose
+./runbook/webhook-version/Set-YalePanExternalDynamicIpLists.ps1 -WebhookData $testWebhookData -Verbose
 
 # Test
 
@@ -337,8 +337,8 @@ $AZURE_AUTOMATION_WEBHOOK = New-AzAutomationWebhook @splat
 $splat = @{}
 $splat = @{
   AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
-  Name = "SetPanEDList"
-  StartTime = "12/07/2019 21:05:00"
+  Name = "SetPanEDList-Hourly"
+  StartTime = $($(Get-Date).AddMinutes(10))
   HourInterval = 1
   ResourceGroupName = $AZURE_RESOURCE_GROUP
 }
@@ -347,10 +347,11 @@ New-AzAutomationSchedule @splat
 
 $splat = @{}
 $splat = @{
-  Name = "SetPanEDList_Scheduled"
-  ScheduleName = "SetPanEDList"
+  RunbookName = $AZURE_RUNBOOK_NAME
+  ScheduleName = "SetPanEDList-Hourly"
   ResourceGroupName = $AZURE_RESOURCE_GROUP
   AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+  Parameters = @{ WebhookData = $testWebhookData }
 }
 Register-AzAutomationScheduledRunbook @splat
 ```

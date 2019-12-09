@@ -7,7 +7,7 @@ Dot source this file from prompt:
 ```
 . ./runbook/webhook-version/Set-TestWebhokVariable
 ```
-in order to have $testWebhook available to script environment
+in order to have $testWebhookData available to script environment
 
 The following variables should be set prior to running:
 
@@ -19,10 +19,10 @@ AZURE_STORAGE_CONTAINER_NAME
 #>
 Remove-Variable -Name testWebhook -Force -ErrorAction Ignore
 
-$testWebhook = [PsCustomObject] @{
+$testWebhookData = [PsCustomObject] @{
   WebhookName =  'TestWebhook'
   RequestHeader = 'Content-Type: application/json'
   RequestBody = "`{`"SubscriptionIds`":[$($($AZURE_SUBSCRIPTION_IDS | % { '`"' + $_ + '`"' }) -join ',')],`"StorageAccount`":`"${AZURE_STORAGE_ACCOUNT_NAME}`",`"StorageContainer`":`"${AZURE_STORAGE_CONTAINER_NAME}`"`}"
 }
 
-$testWebhook
+$testWebhookData
