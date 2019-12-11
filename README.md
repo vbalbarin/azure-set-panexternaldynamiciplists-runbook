@@ -1,6 +1,31 @@
 # Set-PanExternalDynamicIpLists
 
+## Introduction
+
+The information security operations team uses Palo Alto Network Firewalls to monitor and secure traffic at the boundary of the on-premises firewall. The security operations team have agreed to establish a network boundary for the organizations Microsoft Azure resources at the central hub in a hub and spokes architecture.
+
+A Scale
+
+While the Palo Alto Networks Operating System (PAN Os) currently supports a plugin to enable the Azure platform, the security operations team would like to continue using the External Data List (EDL) mechanism to manage the members of IP Address Object groups in Azure.
+
+## Description of Solution
+
+![PanIPEdl-Azure-Automation](assets/PanIPEdl-Azure-Automation.png)
+
+## Implementing Solution
+
+Much of this solution will be implemented through the Powershell commandlets in the `Az`module and Azure Resource Manager templates. Some actions were carried out in the portal.
+
+It should be noted that all of these commandlets are executed within the same shell environment.
+
+The variables names are prefixed with the characters`$AZURE_`. This enables easier management of all the required values in this session using the variable commandlets `Get-Variable -Name "AZURE_*` and `Remove-Variable -Name "AZURE_*`.
+
 ### Login
+
+First login into the subscription that will contain the automation runbook and related resources. This will be the subscription containing the hub VNET.
+
+NB, substitute appropriate values for any strings of the form `{{ UserSuppliedValue }}`.
+
 ```powershell
 Connect-AzAccount -SubscriptionName "{{ SubscriptionName }}"
 
@@ -8,8 +33,14 @@ $AZURE_SUBSCRIPTION_ID =(Get-AzContext).Subscription.Id
 $AZURE_CONTEXT_ACCOUNT_ID = (Get-AzContext).Account.Id
 ```
 
-## Create Resource Group
+### Create Resource Group
+
+Once logged in, use the included ARM template to create a resource group to contain the solution.
+
 ```powershell
+# Create a scratch directory to hold information specific to your environment.
+# This directory is specifically ignored in the accompanying .gitignore file
+
 mkdir ./scratch
 $AZURE_APPLICATION_NAME = 'paniplist'
 
@@ -37,7 +68,7 @@ $AZURE_RG_DEPLOYMENT = New-AzDeployment @splat
 $AZURE_RESOURCE_GROUP = $AZURE_RG_DEPLOYMENT.Outputs.resourceGroupName.Value
 ```
 
-## Create Azure Automation Account
+### Create Azure Automation Account
 
 ```powershell
 # Create a new Azure Automation Account
@@ -158,7 +189,7 @@ Publish-AzAutomationRunbook -Name $AZURE_RUNBOOK_NAME `
 
 ```
 
-## Create Storage Account
+### Create Storage Account
 
 An Azure Storage Account will be created to contain Azure blob storage for the external dynamic IP lists.
 
@@ -213,7 +244,7 @@ $splat = @{
 New-AzRoleAssignment @splat
 # NB, This will take a few minutes to propogate
 
-# Test by repeating the followinng until success
+# Test by repeating the following until successful
 
 Set-AzStorageBlobContent `
   -Context $AZURE_STORAGE_CONTEXT_AAD `
@@ -315,6 +346,44 @@ Out-File -InputObject $AZURE_BLOB_SASTOKENS -Path './scratch/SASTokens.txt' -Enc
 
 ```
 
+### Scheduling Runbook Execution
+
+A schedule will be created and assigned to the runbook.
+
+Runbook schedules have a minimum time resolution of one hour.
+
+```powershell
+# Create runbook schedule
+$splat = @{}
+$splat = @{
+  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+  Name = "SetPanEDList-Hourly"
+  StartTime = $($(Get-Date).AddMinutes(10))
+  HourInterval = 1
+  ResourceGroupName = $AZURE_RESOURCE_GROUP
+}
+
+New-AzAutomationSchedule @splat
+
+# Register the newly created schedule with the runbook.
+# At this point, the parameter value will be set from the value of $testWebhookData established during local testing of the webhook version.
+
+$splat = @{}
+$splat = @{
+  RunbookName = $AZURE_RUNBOOK_NAME
+  ScheduleName = "SetPanEDList-Hourly"
+  ResourceGroupName = $AZURE_RESOURCE_GROUP
+  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
+  Parameters = @{ WebhookData = $testWebhookData }
+}
+Register-AzAutomationScheduledRunbook @splat
+```
+
+If you require finer time resolution than 1 hour, the runbook may be triggered by [configuring a schedule recurring Logic App workflow](https://docs.microsoft.com/en-us/azure/logic-apps/tutorial-build-schedule-recurring-logic-app-workflow).
+
+The following generates the webhook uri for use by Logic App:
+
+
 ```powershell
 # Create webhook for runbook
 $splat = @{}
@@ -332,31 +401,16 @@ $AZURE_AUTOMATION_WEBHOOK = New-AzAutomationWebhook @splat
 # NB, record $AZURE_AUTOMATION_WEBHOOK.uri; if lost must be regenerated
 ```
 
-```powershell
-# Create runbook schedule
-$splat = @{}
-$splat = @{
-  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
-  Name = "SetPanEDList-Hourly"
-  StartTime = $($(Get-Date).AddMinutes(10))
-  HourInterval = 1
-  ResourceGroupName = $AZURE_RESOURCE_GROUP
-}
+### Create Log Analytics Workspace and Link to Automation Account
 
-New-AzAutomationSchedule @splat
+Service owners require email alerts in the event that the runbook fails to update the external data lists files.
 
-$splat = @{}
-$splat = @{
-  RunbookName = $AZURE_RUNBOOK_NAME
-  ScheduleName = "SetPanEDList-Hourly"
-  ResourceGroupName = $AZURE_RESOURCE_GROUP
-  AutomationAccountName = $AZURE_AUTOMATION_ACCOUNT_NAME
-  Parameters = @{ WebhookData = $testWebhookData }
-}
-Register-AzAutomationScheduledRunbook @splat
-```
+A log analytics workspace name must be unique across all Azure subscriptions associeated with the tenant.
+
+This template ensures a name unique across the subscriptions of under the Azure tenant.
 
 ```powershell
+# Copy workspace template and parameters file
 $splat = {}
 $splat = @{
   Path = "./templates/opinsightworkspace/azuredeploy.parameters.json"
@@ -364,6 +418,9 @@ $splat = @{
 }
 Copy-Item @splat
 
+# Edit "azuredeploy.${AZURE_APPLICATION_NAME}.workspace.parameters.json" file
+
+# Deploy workspace template
 $splat= {}
 $splat = @{
   TemplateFile = "./templates/opinsightworkspace/azuredeploy.json"
@@ -381,3 +438,4 @@ $AZURE_AUTOMATION_ACCOUNT_RESOURCEID = (Get-AzResource -ResourceType "Microsoft.
 Set-AzDiagnosticSetting -ResourceId "$AZURE_AUTOMATION_ACCOUNT_RESOURCEID" -WorkspaceId "$AZURE_WORKSPACE_RESOURCEID" -Enabled $true
 
 ```
+In order to be
