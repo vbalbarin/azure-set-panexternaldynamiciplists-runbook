@@ -97,7 +97,7 @@ This will result in a new **Azure Automation Run As Account**:
 
 ![AzureAutomationRunasAccountBladeAzurePortal](assets/AzureAutomationRunasAccountBladeAzurePortal.png)
 
-A corresponding **AzureRunAsConnection** will be created also and can be viewed under the **Shared Resources** of the ***resourcegroups-automation** Azure Automation Account:
+A corresponding **AzureRunAsConnection** will be created also and can be viewed under the **Shared Resources** of the **resourcegroups-automation** Azure Automation Account:
 
 ![SharedResourcesAzureAutomationBladeAzurePortal](assets/SharedResourcesAzureAutomationBladeAzurePortal.png)
 
