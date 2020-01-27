@@ -217,10 +217,14 @@ function AzDataSensitivity {
       [HashTable] $Tags
   )
 
-  if ($Tags.ContainsKey('DataSensitivity')) {
-      $Tags.DataSensitivity
+  if ($Tags.Count -eq 0) {
+    return [String] 'None'
   } else {
-      [String] 'None'
+    if ($Tags.ContainsKey('DataSensitivity')) {
+        $Tags.DataSensitivity
+    } else {
+        [String] 'None'
+    }
   }
 }
 
