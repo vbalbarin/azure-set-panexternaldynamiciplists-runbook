@@ -60,6 +60,7 @@ $AZ_DEPLOYMENT_LOCATION = 'eastus2'
 
 $splat = @{}
 $splat = @{
+  Name = "resourcgroup-$(Get-Date -Format 'yyMMddHHmmm')-deployment"
   Location = $AZ_DEPLOYMENT_LOCATION
   TemplateFile = "./templates/resourcegroup/azuredeploy.json"
   TemplateParameterFile =  "./scratch/azuredeploy.${AZ_APPLICATION_NAME}.resourcegroup.parameters.json"
