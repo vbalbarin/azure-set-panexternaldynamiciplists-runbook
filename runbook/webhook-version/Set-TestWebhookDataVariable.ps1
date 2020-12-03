@@ -14,7 +14,7 @@ The following variables should be set prior to running:
 ```
 $AZ_SUBSCRIPTION_IDS = <list of subscription ids>|empty list|keyword 'all'
 $AZ_STORAGE_ACCOUNT_NAME = <storage account name>
-$AZURE_STORAGE_CONTAINER_NAME = <storage container name>
+$AZ_STORAGE_CONTAINER_NAME = <storage container name>
 ```
 #>
 Remove-Variable -Name testWebhook -Force -ErrorAction Ignore
