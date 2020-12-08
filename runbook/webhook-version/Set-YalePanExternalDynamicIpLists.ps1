@@ -41,6 +41,7 @@ param
   $WebHookData
 )
 
+$YALE_AAD_TENANT = 'dd8cbebb-2139-4df8-b411-4e3e87abeb5c'
 $TMPDIR = $(New-TemporaryFile).DirectoryName
 $PAYLOAD_SCHEMA = @'
 {                                                                                                                                                                                      "definitions": {},
@@ -112,6 +113,7 @@ try {
 } catch {
   if (!$servicePrincipalConnection) {
     Write-Warning "Connection $connectionName not found.. Trying current user context..."
+    Set-AzContext -Tenant $YALE_AAD_TENANT
     $AzureContext = Get-AzContext
     if (!$AzureContext) {
       $errorMessage = "An Azure connection was not found. An Azure context could not be obtained"
@@ -125,11 +127,11 @@ try {
 #endregion : PSAzureProfile
 
 If (!$SubscriptionIDs) {
-  $Subscriptions = @($AzureContext.Subscription)
+  $Subscriptions = @((Set-AzContext -Tenant $YALE_AAD_TENANT).Subscription)
 } elseif ($SubscriptionIDs[0] -ieq 'all') {
-  $Subscriptions = Get-AzSubscription
+  $Subscriptions = Get-AzSubscription -TenantId $YALE_AAD_TENANT
 } else {
-  $Subscriptions = $SubscriptionIDs | ForEach-Object {$id = $_; Get-AzSubscription | Where-Object {$_.SubscriptionId -ieq $id}}
+  $Subscriptions = $SubscriptionIDs | ForEach-Object {$id = $_; Get-AzSubscription -TenantId $YALE_AAD_TENANT| Where-Object {$_.SubscriptionId -ieq $id}}
 }
 
 function Invoke-Main {
@@ -196,21 +198,24 @@ function Invoke-Main {
       Out-File @parms
     }
 
-    $AzureStorageContext = New-AzStorageContext -StorageAccountName "$StorageAccount" `
-                                                  -UseConnectedAccount
+    Write-Verbose ("Azure Context for {0} in subscription {1} in tenant {2}" -f $AzureContext.Account.Id, $AzureContext.Subscription.Name, $AzureContext.Tenant.Id)
+    $AzureStorageContext = New-AzStorageContext -StorageAccountName "$StorageAccount" -UseConnectedAccount
 
       # Using list of dir path strings; strange execution environment for automation account
     # Get-ChildItem -Recurse "$ROOTDIR/ZoneLists" | % {$($_.Directory.Name + '/' + $_.Name)"} returns
     # "C:\temp\[randomstring]"
     $zoneFiles | ForEach-Object {
+      $blb = $(Get-Item -Path "$_" | % { $_.Directory.Name + '/' + $_.Name })
       $parms = @{
         File = "$_"
-        Context = $AzureStorageContext
+        Context = $AzureStorageContext.Context
         Container = $StorageContainer
-        Blob = "$(Get-Item -Path "$_" | % { $_.Directory.Name + '/' + $_.Name })"
+        Blob = $blb
         Properties = @{"ContentType" = "text/plain;charset=ansi"}
+        Force = $true
       }
-      Set-AzStorageBlobContent @parms -Force
+      Write-Verbose ("Uploading {0} to {1}" -f $_, $blb)
+      Set-AzStorageBlobContent @parms
 
       }
     } else {
